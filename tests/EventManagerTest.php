@@ -26,13 +26,22 @@ class EventManagerTest extends TestCase
         $this->assertEquals($events, $em->getEvents());
     }
 
+    public function testGetSetListeners()
+    {
+        $em = $this->getInstance();
+        $this->assertEquals([], $this->invokeProperty($em, 'listeners'));
+        $listeners = ['something'];
+        $em->setListeners($listeners);
+        $this->assertEquals($listeners, $em->getListeners());
+    }
+
     public function testBind()
     {
         $name     = 'some_event';
         $listener = new EventListener();
 
         EventManager::bind($name, $listener);
-        $this->assertEquals([$name => [$listener]], EventManager::getInstance()->getEvents());
+        $this->assertEquals([$name => [$listener]], EventManager::getInstance()->getListeners());
     }
 
     public function testUnbind()
@@ -73,9 +82,9 @@ class EventManagerTest extends TestCase
         EventManager::setInstance($em);
 
         $em->bind($name, $listener);
-        $this->assertEquals([$name => [$listener]], $em->getEvents());
+        $this->assertEquals([$name => [$listener]], $em->getListeners());
         $em->unbindEvent($name);
-        $this->assertEquals([$name => []], $em->getEvents());
+        $this->assertEquals([$name => []], $em->getListeners());
     }
 
     public function testUnbindEventListener()
@@ -87,9 +96,9 @@ class EventManagerTest extends TestCase
 
         $em->bind($name, $listener);
         $em->bind($name, $listener);
-        $this->assertEquals([$name => [$listener, $listener]], $em->getEvents());
+        $this->assertEquals([$name => [$listener, $listener]], $em->getListeners());
         $em->unbindEventListener($name, get_class($listener));
-        $this->assertEquals([$name => []], $em->getEvents());
+        $this->assertEquals([$name => []], $em->getListeners());
     }
 
     public function testUnbindEventListenerByOrderId()
@@ -104,9 +113,9 @@ class EventManagerTest extends TestCase
         $anotherListener->setOrderId($orderId);
         $em->bind($name, $listener);
         $em->bind($name, $anotherListener);
-        $this->assertEquals([$name => [$listener, $anotherListener]], $em->getEvents());
+        $this->assertEquals([$name => [$listener, $anotherListener]], $em->getListeners());
         $em->unbindEventListenerByOrderId($name, get_class($listener), $orderId);
-        $this->assertEquals([$name => [$listener]], $em->getEvents());
+        $this->assertEquals([$name => [$listener]], $em->getListeners());
     }
 
     public function testUnbindEventListenerByOrderIdThrowInvalidArgumentException()
@@ -118,7 +127,7 @@ class EventManagerTest extends TestCase
         $em              = $this->getInstance();
         EventManager::setInstance($em);
 
-        $em->setEvents([$name => [$listener, $anotherListener]]);
+        $em->setListeners([$name => [$listener, $anotherListener]]);
         $this->expectException(InvalidArgumentException::class);
         $em->unbindEventListenerByOrderId($name, get_class(), $orderId);
     }

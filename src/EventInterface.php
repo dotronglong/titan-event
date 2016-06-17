@@ -9,11 +9,23 @@ interface EventInterface extends BagInterface
      *
      * @return string
      */
-    public function getName();
+    public static function getName();
 
     /**
      * Set event name
      * @param string $name
      */
-    public function setName($name);
+    public static function setName($name);
+
+    /**
+     * Check if event is stopped
+     *
+     * @return bool
+     */
+    public function isStopped();
+
+    /**
+     * Stop running event
+     */
+    public function stop();
 }

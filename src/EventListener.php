@@ -43,4 +43,8 @@ class EventListener implements EventListenerInterface
     {
         $this->orderId = $orderId;
     }
+
+    public function run(EventInterface $event)
+    {
+    }
 }

@@ -12,9 +12,8 @@ class EventTest extends TestCase
 
     public function testGetSetName()
     {
-        $event = $this->getInstance();
-        $this->assertNull($this->invokeProperty($event, 'name'));
-        $event->setName('hello_world');
-        $this->assertEquals('hello_world', $event->getName());
+        $name = 'some_event';
+        Event::setName($name);
+        $this->assertEquals($name, Event::getName());
     }
 }

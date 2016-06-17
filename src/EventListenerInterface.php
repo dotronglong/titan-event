@@ -32,4 +32,12 @@ interface EventListenerInterface
      * @param int $orderId
      */
     public function setOrderId($orderId);
+
+    /**
+     * Event is fired to listener
+     *
+     * @param EventInterface $event
+     * @return mixed
+     */
+    public function run(EventInterface $event);
 }

@@ -9,21 +9,36 @@ class Event implements EventInterface
     /**
      * @var string
      */
-    private $name;
+    private static $name;
+
+    /**
+     * @var bool
+     */
+    private $isStopped = false;
 
     /**
      * @return string
      */
-    public function getName()
+    public static function getName()
     {
-        return $this->name;
+        return self::$name;
     }
 
     /**
      * @param string $name
      */
-    public function setName($name)
+    public static function setName($name)
     {
-        $this->name = $name;
+        self::$name = $name;
+    }
+
+    public function isStopped()
+    {
+        return $this->isStopped;
+    }
+
+    public function stop()
+    {
+        $this->isStopped = true;
     }
 }

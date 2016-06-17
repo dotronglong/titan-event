@@ -1,6 +1,8 @@
 <?php namespace Titan\Event;
 
+use Closure;
 use Titan\Common\Singleton;
+use Titan\Event\Exception\EventNotFoundException;
 use Titan\Event\Exception\InvalidArgumentException;
 
 class EventManager extends Singleton
@@ -9,6 +11,11 @@ class EventManager extends Singleton
      * @var array
      */
     private $events = [];
+
+    /**
+     * @var array
+     */
+    private $listeners = [];
 
     /**
      * Get all events
@@ -31,20 +38,40 @@ class EventManager extends Singleton
     }
 
     /**
+     * Get all listeners
+     *
+     * @return array
+     */
+    public function getListeners()
+    {
+        return $this->listeners;
+    }
+
+    /**
+     * Set all listeners
+     *
+     * @param array $listeners
+     */
+    public function setListeners($listeners)
+    {
+        $this->listeners = $listeners;
+    }
+
+    /**
      * Bind a listener to Event Manager
      * @param string                 $name name of event
      * @param EventListenerInterface $listener
      */
     public static function bind($name, EventListenerInterface $listener)
     {
-        $em     = static::getInstance();
-        $events = $em->getEvents();
-        if (!isset($events[$name])) {
-            $events[$name] = [];
+        $em        = static::getInstance();
+        $listeners = $em->getListeners();
+        if (!isset($listeners[$name])) {
+            $listeners[$name] = [];
         }
 
-        $events[$name][] = $listener;
-        $em->setEvents($events);
+        $listeners[$name][] = $listener;
+        $em->setListeners($listeners);
     }
 
     /**
@@ -74,9 +101,9 @@ class EventManager extends Singleton
      */
     public function unbindEvent($name)
     {
-        $events        = $this->getEvents();
-        $events[$name] = [];
-        $this->setEvents($events);
+        $listeners        = $this->getListeners();
+        $listeners[$name] = [];
+        $this->setListeners($listeners);
     }
 
     /**
@@ -88,15 +115,15 @@ class EventManager extends Singleton
      */
     public function unbindEventListener($name, $listener)
     {
-        $events = $this->getEvents();
-        if (isset($events[$name]) && count($events[$name])) {
-            foreach ($events[$name] as $i => $eventListener) {
+        $listeners = $this->getListeners();
+        if (isset($listeners[$name]) && count($listeners[$name])) {
+            foreach ($listeners[$name] as $i => $eventListener) {
                 if (get_class($eventListener) === $listener) {
-                    unset($events[$name][$i]);
+                    unset($listeners[$name][$i]);
                 }
             }
         }
-        $this->setEvents($events);
+        $this->setListeners($listeners);
     }
 
     /**
@@ -107,13 +134,13 @@ class EventManager extends Singleton
      */
     public function unbindEventListenerByOrderId($name, $listener, $orderId)
     {
-        $events = $this->getEvents();
-        if (isset($events[$name]) && count($events[$name])) {
-            foreach ($events[$name] as $i => $eventListener) {
+        $listeners = $this->getListeners();
+        if (isset($listeners[$name]) && count($listeners[$name])) {
+            foreach ($listeners[$name] as $i => $eventListener) {
                 if (get_class($eventListener) === $listener) {
                     if ($eventListener instanceof EventListenerInterface) {
                         if ($eventListener->getOrderId() === $orderId) {
-                            unset($events[$name][$i]);
+                            unset($listeners[$name][$i]);
                         }
                     } else {
                         throw new InvalidArgumentException(get_class($eventListener) . ' must implement EventListenerInterface.');
@@ -121,6 +148,130 @@ class EventManager extends Singleton
                 }
             }
         }
-        $this->setEvents($events);
+        $this->setListeners($listeners);
+    }
+
+    /**
+     * Add an event
+     *
+     * @param EventInterface $event
+     */
+    public static function addEvent(EventInterface $event)
+    {
+        $em     = static::getInstance();
+        $events = $em->getEvents();
+
+        $events[$event->getName()] = $event;
+        $em->setEvents($events);
+    }
+
+    /**
+     * Remove an event by name
+     *
+     * @param string $name
+     */
+    public static function removeEvent($name)
+    {
+        $em     = static::getInstance();
+        $events = $em->getEvents();
+
+        unset($events[$name]);
+        $em->setEvents($events);
+    }
+
+    public static function fire($name, $runner = null)
+    {
+        $em     = static::getInstance();
+        $events = $em->getEvents();
+        if (!isset($events[$name])) {
+            throw new EventNotFoundException("Event $name could not be found.");
+        }
+
+        $event = $events[$name];
+        if (!$event instanceof EventInterface) {
+            throw new InvalidArgumentException(get_class($event) . ' must implement EventInterface');
+        }
+
+        if ($runner) {
+            if ($runner instanceof Closure) {
+                $em->fireEventClosure($event, $runner);
+            } elseif (is_array($runner)) {
+                $em->fireEventArray($event, $runner);
+            } else {
+                throw new InvalidArgumentException("Invalid type of event runner.");
+            }
+        } else {
+            $em->fireEvent($event);
+        }
+    }
+
+    protected function getSortedListeners($name, $asc = true)
+    {
+        $em              = static::getInstance();
+        $listeners       = $em->getListeners();
+        $sortedListeners = [];
+        if (isset($listeners[$name]) && count($listeners[$name])) {
+            $sortedListeners = $listeners[$name];
+            $totalListeners  = count($sortedListeners);
+            for ($i = 0; $i < $totalListeners - 1; $i++) {
+                $guard         = $i;
+                $guardListener = $sortedListeners[$guard];
+                for ($j = $i + 1; $j < $totalListeners; $j++) {
+                    $currentListener = $sortedListeners[$j];
+                    if ($guardListener instanceof EventListenerInterface
+                        && $currentListener instanceof EventListenerInterface
+                    ) {
+                        if ($asc && $guardListener->getOrderId() > $currentListener->getOrderId()
+                            || !$asc && $guardListener->getOrderId() < $currentListener->getOrderId()
+                        ) {
+                            $guard = $j;
+                        }
+                    }
+                }
+
+                // swap them
+                if ($i !== $guard) {
+                    $temporaryListener       = $sortedListeners[$i];
+                    $sortedListeners[$i]     = $sortedListeners[$guard];
+                    $sortedListeners[$guard] = $temporaryListener;
+                }
+            }
+        }
+
+        return $sortedListeners;
+    }
+
+    public function fireEvent(EventInterface $event)
+    {
+        $listeners = $this->getSortedListeners($event->getName());
+        foreach ($listeners as $listener) {
+            if ($listener instanceof EventListenerInterface) {
+                $listener->run($event);
+            }
+
+            if ($event->isStopped()) {
+                break;
+            }
+        }
+
+        return $event;
+    }
+
+    public function fireEventClosure(EventInterface $event, Closure $closure)
+    {
+        $event = call_user_func_array($closure, [$event]);
+
+        return $this->fireEvent($event);
+    }
+
+    public function fireEventArray(EventInterface $event, array $arguments = [])
+    {
+        if (count($arguments)) {
+            foreach ($arguments as $key => $value) {
+                $event->set($key, $value);
+            }
+        }
+
+        return $this->fireEvent($event);
     }
 }
