@@ -1,2 +1,2 @@
 # titan-event
-Event Manager for Titan project
+Event Manager for Titan framework

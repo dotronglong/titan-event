@@ -1,0 +1,43 @@
+{
+    "name": "dotronglong/titan-event",
+    "description": "Event Manager for Titan framework",
+    "keywords": ["event", "titan"],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Long Do",
+            "email": "me@dotronglong.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Titan\\Event\\": "src"
+        },
+        "classmap": []
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Titan\\Tests\\Event\\": "tests"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/dotronglong/titan-common"
+        }
+    ],
+    "require": {
+        "php": ">=5.5.9",
+        "dotronglong/titan-common": "dev-master"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^5.0"
+    }
+}
