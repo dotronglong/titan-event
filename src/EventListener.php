@@ -1,10 +1,7 @@
 <?php namespace Titan\Event;
 
-class Listener implements ListenerInterface
+class EventListener implements EventListenerInterface
 {
-    const ORDER_DEFAULT = 10;
-    const ORDER_LOWEST  = 1;
-
     /**
      * @var EventInterface
      */

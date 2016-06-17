@@ -11,6 +11,8 @@ class EventManager extends Singleton
     private $events = [];
 
     /**
+     * Get all events
+     *
      * @return array
      */
     public function getEvents()
@@ -19,6 +21,8 @@ class EventManager extends Singleton
     }
 
     /**
+     * Set all events
+     *
      * @param array $events
      */
     public function setEvents($events)
@@ -28,18 +32,19 @@ class EventManager extends Singleton
 
     /**
      * Bind a listener to Event Manager
-     * @param string            $name name of event
-     * @param ListenerInterface $listener
+     * @param string                 $name name of event
+     * @param EventListenerInterface $listener
      */
-    public static function bind($name, ListenerInterface $listener)
+    public static function bind($name, EventListenerInterface $listener)
     {
-        $events = static::getInstance()->getEvents();
+        $em     = static::getInstance();
+        $events = $em->getEvents();
         if (!isset($events[$name])) {
             $events[$name] = [];
         }
 
         $events[$name][] = $listener;
-        static::getInstance()->setEvents($events);
+        $em->setEvents($events);
     }
 
     /**
@@ -52,12 +57,13 @@ class EventManager extends Singleton
      */
     public static function unbind($name, $listener = null, $orderId = null)
     {
+        $em = static::getInstance();
         if ($listener !== null && $orderId !== null) {
-            static::getInstance()->unbindEventListenerByOrder($name, $listener, $orderId);
+            $em->unbindEventListenerByOrderId($name, $listener, $orderId);
         } elseif ($listener !== null) {
-            static::getInstance()->unbindEventListener($name, $listener);
+            $em->unbindEventListener($name, $listener);
         } else {
-            static::getInstance()->unbindEvent($name);
+            $em->unbindEvent($name);
         }
     }
 
@@ -68,8 +74,8 @@ class EventManager extends Singleton
      */
     public function unbindEvent($name)
     {
-        $events = $this->getEvents();
-        unset($events[$name]);
+        $events        = $this->getEvents();
+        $events[$name] = [];
         $this->setEvents($events);
     }
 
@@ -99,18 +105,18 @@ class EventManager extends Singleton
      * @param int    $orderId
      * @throws InvalidArgumentException
      */
-    public function unbindEventListenerByOrder($name, $listener, $orderId)
+    public function unbindEventListenerByOrderId($name, $listener, $orderId)
     {
         $events = $this->getEvents();
         if (isset($events[$name]) && count($events[$name])) {
             foreach ($events[$name] as $i => $eventListener) {
                 if (get_class($eventListener) === $listener) {
-                    if ($listener instanceof ListenerInterface) {
-                        if ($listener->getOrderId() === $orderId) {
+                    if ($eventListener instanceof EventListenerInterface) {
+                        if ($eventListener->getOrderId() === $orderId) {
                             unset($events[$name][$i]);
                         }
                     } else {
-                        throw new InvalidArgumentException(get_class($listener) . ' must implement ListenerInterface.');
+                        throw new InvalidArgumentException(get_class($eventListener) . ' must implement EventListenerInterface.');
                     }
                 }
             }
