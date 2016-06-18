@@ -99,7 +99,7 @@ class EventManager extends Singleton
      *
      * @param string $name
      */
-    public function unbindEvent($name)
+    protected function unbindEvent($name)
     {
         $listeners        = $this->getListeners();
         $listeners[$name] = [];
@@ -113,7 +113,7 @@ class EventManager extends Singleton
      * @param string $name
      * @param string $listener
      */
-    public function unbindEventListener($name, $listener)
+    protected function unbindEventListener($name, $listener)
     {
         $listeners = $this->getListeners();
         if (isset($listeners[$name]) && count($listeners[$name])) {
@@ -132,7 +132,7 @@ class EventManager extends Singleton
      * @param int    $orderId
      * @throws InvalidArgumentException
      */
-    public function unbindEventListenerByOrderId($name, $listener, $orderId)
+    protected function unbindEventListenerByOrderId($name, $listener, $orderId)
     {
         $listeners = $this->getListeners();
         if (isset($listeners[$name]) && count($listeners[$name])) {
@@ -179,6 +179,16 @@ class EventManager extends Singleton
         $em->setEvents($events);
     }
 
+    /**
+     * Fire an event by name
+     *
+     * @param string             $name name of event
+     * @param Closure|array|null $runner Runner might be a closure to do extra actions on event,
+     *                                   or simply an array to assign key-value pairs to event
+     * @return EventInterface
+     * @throws EventNotFoundException
+     * @throws InvalidArgumentException
+     */
     public static function fire($name, $runner = null)
     {
         $em     = static::getInstance();
@@ -203,8 +213,17 @@ class EventManager extends Singleton
         } else {
             $em->fireEvent($event);
         }
+
+        return $event;
     }
 
+    /**
+     * Get sorted listeners by orderId. Use selection sort algorithm
+     *
+     * @param string $name
+     * @param bool   $asc Sort ordering. TRUE if ascending, and FALSE if descending
+     * @return array
+     */
     protected function getSortedListeners($name, $asc = true)
     {
         $em              = static::getInstance();
@@ -214,9 +233,9 @@ class EventManager extends Singleton
             $sortedListeners = $listeners[$name];
             $totalListeners  = count($sortedListeners);
             for ($i = 0; $i < $totalListeners - 1; $i++) {
-                $guard         = $i;
-                $guardListener = $sortedListeners[$guard];
+                $guard = $i;
                 for ($j = $i + 1; $j < $totalListeners; $j++) {
+                    $guardListener   = $sortedListeners[$guard];
                     $currentListener = $sortedListeners[$j];
                     if ($guardListener instanceof EventListenerInterface
                         && $currentListener instanceof EventListenerInterface
@@ -241,12 +260,20 @@ class EventManager extends Singleton
         return $sortedListeners;
     }
 
-    public function fireEvent(EventInterface $event)
+    /**
+     * Fire an event
+     *
+     * @param EventInterface $event
+     * @return EventInterface
+     */
+    protected function fireEvent(EventInterface $event)
     {
         $listeners = $this->getSortedListeners($event->getName());
         foreach ($listeners as $listener) {
             if ($listener instanceof EventListenerInterface) {
-                $listener->run($event);
+                if ($listener->run($event) === false) {
+                    $event->stop();
+                }
             }
 
             if ($event->isStopped()) {
@@ -257,14 +284,28 @@ class EventManager extends Singleton
         return $event;
     }
 
-    public function fireEventClosure(EventInterface $event, Closure $closure)
+    /**
+     * Fire an event which is result of a closure
+     *
+     * @param EventInterface $event
+     * @param Closure        $closure
+     * @return EventInterface
+     */
+    protected function fireEventClosure(EventInterface $event, Closure $closure)
     {
         $event = call_user_func_array($closure, [$event]);
 
         return $this->fireEvent($event);
     }
 
-    public function fireEventArray(EventInterface $event, array $arguments = [])
+    /**
+     * Fire an event after setting arguments to event
+     *
+     * @param EventInterface $event
+     * @param array          $arguments
+     * @return EventInterface
+     */
+    protected function fireEventArray(EventInterface $event, array $arguments = [])
     {
         if (count($arguments)) {
             foreach ($arguments as $key => $value) {

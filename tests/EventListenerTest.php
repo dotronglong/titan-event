@@ -19,12 +19,10 @@ class EventListenerTest extends TestCase
         $this->assertEquals(5, $listener->getOrderId());
     }
 
-    public function testGetSetEvent()
+    public function testRun()
     {
         $listener = $this->getInstance();
-        $event    = new Event();
-        $this->assertNull($this->invokeProperty($listener, 'event'));
-        $listener->setEvent($event);
-        $this->assertEquals($event, $listener->getEvent());
+        $event = new Event();
+        $this->assertNull($listener->run($event));
     }
 }

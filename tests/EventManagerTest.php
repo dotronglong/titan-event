@@ -1,9 +1,13 @@
 <?php namespace Titan\Tests\Event;
 
+use Titan\Event\Event;
+use Titan\Event\EventInterface;
 use Titan\Event\EventListener;
+use Titan\Event\EventListenerInterface;
 use Titan\Event\EventManager;
 use Titan\Event\Exception\InvalidArgumentException;
 use Titan\Tests\Common\TestCase;
+use Titan\Event\Exception\EventNotFoundException;
 
 class EventManagerTest extends TestCase
 {
@@ -15,6 +19,11 @@ class EventManagerTest extends TestCase
     private function getInstance()
     {
         return new EventManager;
+    }
+
+    private function getEventInstance()
+    {
+        return new Event();
     }
 
     public function testGetSetEvents()
@@ -83,7 +92,7 @@ class EventManagerTest extends TestCase
 
         $em->bind($name, $listener);
         $this->assertEquals([$name => [$listener]], $em->getListeners());
-        $em->unbindEvent($name);
+        $this->invokeMethod($em, 'unbindEvent', [$name]);
         $this->assertEquals([$name => []], $em->getListeners());
     }
 
@@ -96,8 +105,16 @@ class EventManagerTest extends TestCase
 
         $em->bind($name, $listener);
         $em->bind($name, $listener);
-        $this->assertEquals([$name => [$listener, $listener]], $em->getListeners());
-        $em->unbindEventListener($name, get_class($listener));
+        $this->assertEquals([
+            $name => [
+                $listener,
+                $listener
+            ]
+        ], $em->getListeners());
+        $this->invokeMethod($em, 'unbindEventListener', [
+            $name,
+            get_class($listener)
+        ]);
         $this->assertEquals([$name => []], $em->getListeners());
     }
 
@@ -113,8 +130,17 @@ class EventManagerTest extends TestCase
         $anotherListener->setOrderId($orderId);
         $em->bind($name, $listener);
         $em->bind($name, $anotherListener);
-        $this->assertEquals([$name => [$listener, $anotherListener]], $em->getListeners());
-        $em->unbindEventListenerByOrderId($name, get_class($listener), $orderId);
+        $this->assertEquals([
+            $name => [
+                $listener,
+                $anotherListener
+            ]
+        ], $em->getListeners());
+        $this->invokeMethod($em, 'unbindEventListenerByOrderId', [
+            $name,
+            get_class($listener),
+            $orderId
+        ]);
         $this->assertEquals([$name => [$listener]], $em->getListeners());
     }
 
@@ -127,8 +153,183 @@ class EventManagerTest extends TestCase
         $em              = $this->getInstance();
         EventManager::setInstance($em);
 
-        $em->setListeners([$name => [$listener, $anotherListener]]);
+        $em->setListeners([
+            $name => [
+                $listener,
+                $anotherListener
+            ]
+        ]);
         $this->expectException(InvalidArgumentException::class);
-        $em->unbindEventListenerByOrderId($name, get_class(), $orderId);
+        $this->invokeMethod($em, 'unbindEventListenerByOrderId', [
+            $name,
+            get_class(),
+            $orderId
+        ]);
+    }
+
+    public function testAddEvent()
+    {
+        $em = EventManager::getInstance();
+        $this->assertEquals([], $em->getEvents());
+
+        $event = $this->getEventInstance();
+        EventManager::addEvent($event);
+        $this->assertEquals([$event::getName() => $event], $em->getEvents());
+    }
+
+    public function testRemoveEvent()
+    {
+        $em    = EventManager::getInstance();
+        $event = $this->getEventInstance();
+
+        EventManager::addEvent($event);
+        $em->setEvents([$event::getName() => $event]);
+
+        EventManager::removeEvent($event::getName());
+        $this->assertEquals([], $em->getEvents());
+    }
+
+    public function testGetSortedListeners()
+    {
+        $em         = EventManager::getInstance();
+        $listener   = new EventListener();
+        $listener_1 = clone $listener;
+        $listener_2 = clone $listener;
+
+        $listener->setOrderId(30);
+        $listener_1->setOrderId(10);
+        $listener_2->setOrderId(20);
+
+        $name  = 'some_event';
+        $event = new Event();
+        $event::setName($name);
+
+        // current order: listener (30) -> listener_1 (10) -> listener_2 (20)
+        $em->bind($name, $listener);
+        $em->bind($name, $listener_1);
+        $em->bind($name, $listener_2);
+
+        // sort ascending, expected result is listener_1 -> listener_2 -> listener
+        $this->assertEquals([
+            $listener_1,
+            $listener_2,
+            $listener
+        ], $this->invokeMethod($em, 'getSortedListeners', [
+            $name,
+            true
+        ]));
+
+        // sort descending, expected result is listener -> listener_2 -> listener_1
+        $this->assertEquals([
+            $listener,
+            $listener_2,
+            $listener_1
+        ], $this->invokeMethod($em, 'getSortedListeners', [
+            $name,
+            false
+        ]));
+    }
+
+    public function testFire()
+    {
+        $name  = 'some_event';
+        $event = $this->getEventInstance();
+        $event->setName($name);
+        $em = $this->getMockBuilder(EventManager::class)->setMethods([
+            'fireEventClosure',
+            'fireEventArray',
+            'fireEvent',
+            'getEvents'
+        ])->getMock();
+        $em->expects($this->exactly(3))->method('getEvents')->willReturn([$name => $event]);
+        $em->expects($this->once())->method('fireEventClosure');
+        $em->expects($this->once())->method('fireEventArray');
+        $em->expects($this->once())->method('fireEvent');
+        EventManager::setInstance($em);
+
+        $em->fire($name, function ($event) {
+        });
+        $em->fire($name, ['a' => 'b']);
+        $em->fire($name);
+    }
+
+    public function testFireEventNotFoundException()
+    {
+        $this->expectException(EventNotFoundException::class);
+        $em = $this->getMockBuilder(EventManager::class)->setMethods(['getEvents'])->getMock();
+        $em->expects($this->once())->method('getEvents')->willReturn([]);
+        EventManager::setInstance($em);
+        $em->fire('some_event');
+    }
+
+    public function testFireInvalidArgumentException()
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $em = $this->getMockBuilder(EventManager::class)->setMethods(['getEvents'])->getMock();
+        $em->expects($this->once())->method('getEvents')->willReturn(['some_event' => new self]);
+        EventManager::setInstance($em);
+        $em->fire('some_event');
+    }
+
+    public function testFireInvalidArgumentExceptionToRunner()
+    {
+        $name  = 'some_event';
+        $event = $this->getEventInstance();
+        $event->setName($name);
+        $em = $this->getMockBuilder(EventManager::class)->setMethods([
+            'getEvents'
+        ])->getMock();
+        $em->expects($this->once())->method('getEvents')->willReturn([$name => $event]);
+        EventManager::setInstance($em);
+
+        $this->expectException(InvalidArgumentException::class);
+        $em->fire($name, 5);
+    }
+
+    public function testFireEvent()
+    {
+        $name  = 'some_event';
+        $event = $this->getMockBuilder(Event::class)->setMethods([
+            'stop',
+            'isStopped'
+        ])->getMock();
+        $event->expects($this->once())->method('stop');
+        $event->expects($this->once())->method('isStopped')->willReturn(true);
+        $event->setName($name);
+
+        $listener = $this->getMockBuilder(EventListener::class)->setMethods(['run'])->getMock();
+        $listener->expects($this->once())->method('run')->with($this->equalTo($event))->willReturn(false);
+
+        $em = $this->getMockBuilder(EventManager::class)->setMethods(['getSortedListeners'])->getMock();
+        $em->expects($this->once())->method('getSortedListeners')->with($this->equalTo($name))->willReturn([$listener]);
+        EventManager::setInstance($em);
+
+        $this->invokeMethod($em, 'fireEvent', [$event]);
+    }
+
+    public function testFireEventClosure()
+    {
+        $event = $this->getEventInstance();
+        $eventAfter = clone $event;
+        $eventAfter->set('some-key', 'some-value');
+        $em    = $this->getMockBuilder(EventManager::class)->setMethods(['fireEvent'])->getMock();
+        $em->expects($this->once())->method('fireEvent')->with($this->equalTo($eventAfter));
+        EventManager::setInstance($em);
+
+        $this->invokeMethod($em, 'fireEventClosure', [$event, function($event) use ($eventAfter) {
+            return $eventAfter;
+        }]);
+    }
+
+    public function testFireEventArray()
+    {
+        $event = $this->getEventInstance();
+        $eventAfter = clone $event;
+        $eventAfter->set('some-key', 'some-value');
+        $em    = $this->getMockBuilder(EventManager::class)->setMethods(['fireEvent'])->getMock();
+        $em->expects($this->once())->method('fireEvent')->with($this->equalTo($eventAfter));
+        EventManager::setInstance($em);
+
+        $this->invokeMethod($em, 'fireEventArray', [$event, ['some-key' => 'some-value']]);
     }
 }

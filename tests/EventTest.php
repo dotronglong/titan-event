@@ -16,4 +16,22 @@ class EventTest extends TestCase
         Event::setName($name);
         $this->assertEquals($name, Event::getName());
     }
+
+    public function testStop()
+    {
+        $event = $this->getInstance();
+        $this->assertFalse($this->invokeProperty($event, 'isStopped'));
+
+        $event->stop();
+        $this->assertTrue($this->invokeProperty($event, 'isStopped'));
+    }
+
+    public function testIsStopped()
+    {
+        $event = $this->getInstance();
+        $this->assertFalse($event->isStopped());
+
+        $this->invokeProperty($event, 'isStopped', true);
+        $this->assertTrue($event->isStopped());
+    }
 }

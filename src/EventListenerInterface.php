@@ -6,20 +6,6 @@ interface EventListenerInterface
     const ORDER_LOWEST  = 1;
 
     /**
-     * Set event
-     *
-     * @param EventInterface $event
-     */
-    public function setEvent(EventInterface $event);
-
-    /**
-     * Get event
-     *
-     * @return EventInterface
-     */
-    public function getEvent();
-
-    /**
      * Get Order Id
      *
      * @return int
@@ -34,10 +20,10 @@ interface EventListenerInterface
     public function setOrderId($orderId);
 
     /**
-     * Event is fired to listener
+     * Event is fired to listener, and ready to run
      *
      * @param EventInterface $event
-     * @return mixed
+     * @return bool false to stop event, skip result if otherwise
      */
     public function run(EventInterface $event);
 }

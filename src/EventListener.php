@@ -3,30 +3,9 @@
 class EventListener implements EventListenerInterface
 {
     /**
-     * @var EventInterface
-     */
-    private $event;
-
-    /**
      * @var int
      */
     protected $orderId = self::ORDER_DEFAULT;
-
-    /**
-     * @return EventInterface
-     */
-    public function getEvent()
-    {
-        return $this->event;
-    }
-
-    /**
-     * @param EventInterface $event
-     */
-    public function setEvent(EventInterface $event)
-    {
-        $this->event = $event;
-    }
 
     /**
      * @return int
